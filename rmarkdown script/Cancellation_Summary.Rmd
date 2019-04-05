@@ -1,0 +1,324 @@
+---
+output:
+  word_document:
+    reference_docx: "Template/Cancellation_Summary.docx"
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE,error=FALSE}
+
+### 1. Read in data file ----
+
+library("zoo")
+library("lubridate")
+library("RcppBDT")
+library("ggplot2")
+library("reshape2")
+
+
+
+csv<-read.csv('Data/Cancellation lookup.csv',check.names=FALSE)
+
+
+### 2. Calculate any variables needed in report ----
+
+
+#Find last column and row of data
+lastcol<-ncol(csv)
+lastrow<-nrow(csv)
+
+
+#Get total scheduled operations for recent month and same month last year
+index <- which(csv$Board == "NHS Scotland" & csv$Indicator == "Total Ops")
+total<-format(csv[index,lastcol],big.mark = ",",trim=TRUE,scientific = FALSE)
+
+LastTotal<-format(csv[index,lastcol-12],big.mark=",",trim=TRUE,scientific=FALSE)
+
+
+#Calculate percentage change from last year
+change<-format(round(abs((csv[index,lastcol]-csv[index,lastcol-12])/csv[index,lastcol-12])*100,1),nsmall=1)
+
+changetext<-if((csv[1,lastcol]-csv[1,lastcol-12])<0) {
+  "a decrease"
+} else {
+  "an increase"
+}
+
+#Calculate dates
+#date<-as.yearmon(names(csv)[lastcol],'%B.%y')
+date <- as.Date(names(csv)[lastcol], format = "%Y-%m-%d")
+#date <- as.Date(names(csv)[lastcol], format = "%d/%m/%Y")
+
+
+#Lastdate<-as.yearmon(names(csv)[lastcol-12],'%B.%y')
+Lastdate<-as.Date(names(csv)[lastcol-12], format = "%Y-%m-%d")
+#Lastdate<-as.Date(names(csv)[lastcol-12], format = "%d/%m/%Y")
+
+
+month<-format(date,'%B')
+Lastmonth<-format(Lastdate,'%B')
+year<-as.numeric(format(date,'%Y'))
+Lastyear<-as.numeric(format(Lastdate,'%Y'))
+MonthEnd <- date + months(1) - 1
+MonthEndDay<-format(MonthEnd, '%d')
+
+
+PublicationMonth <- if (match(substr(month,1,3), month.abb)+2==13) {
+  1
+} else if (match(substr(month,1,3), month.abb)+2==14) {
+  2
+} else match(substr(month,1,3), month.abb)+2
+
+NextPubMonth <- if (match(substr(month,1,3), month.abb)+3==13) {
+  1
+} else if (match(substr(month,1,3), month.abb)+3==14) {
+  2
+} else if (match(substr(month,1,3), month.abb)+3==15) {
+  3
+} else match(substr(month,1,3), month.abb)+3
+
+
+
+PublicationYear <- if (PublicationMonth %in% c(1,2)) {
+  year+1
+} else year
+
+NextPubYear <- if (NextPubMonth %in% c(1,2,3)) {
+  year+1
+} else year
+
+
+PublicationDate <-getNthDayOfWeek(first, Tue, PublicationMonth, PublicationYear)
+NextPubDate <-getNthDayOfWeek(first, Tue, NextPubMonth, NextPubYear)
+
+PubDay <- format(PublicationDate, '%d')
+PubMonth <- format(PublicationDate, '%B')
+PubYear <- format(PublicationDate, '%Y')
+
+PubDay2 <- gsub("0","",PubDay)
+
+NPubDay <- format(NextPubDate, '%d')
+NPubMonth <- format(NextPubDate, '%B')
+NPubYear <- format(NextPubDate, '%Y')
+
+PubNum <-as.character(PublicationMonth)
+
+PubMonthNum <- if (PubNum %in% c("1","2","3","4","5","6","7","8","9")) {
+  paste0("0",PubNum)
+} else PubNum
+
+
+
+#Get each Scotland level Indicator for this year
+TotalCans<-format(csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Total Cancelled"),lastcol],big.mark = ",",trim=TRUE,scientific = FALSE)
+PatCans<-format(csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Cancelled by patient"),lastcol],big.mark = ",",trim=TRUE,scientific = FALSE)
+ClinCans<-format(csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Clinical reason"),lastcol],big.mark = ",",trim=TRUE,scientific = FALSE)
+CapCans<-format(csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Non-clinical/Capacity reason"),lastcol],big.mark = ",",trim=TRUE,scientific = FALSE)
+OtCans<-format(csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Other"),lastcol],big.mark = ",",trim=TRUE,scientific = FALSE)
+
+
+#Calculate percentage cancellations for Scotland for this year
+TotalCansPer<-round(abs((csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Total Cancelled"),lastcol]/csv[index,lastcol])*100),1)
+PatCansPer<-round(abs((csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Cancelled by patient"),lastcol]/csv[index,lastcol])*100),1)
+ClinCansPer<-round(abs((csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Clinical reason"),lastcol]/csv[index,lastcol])*100),1)
+CapCansPer<-round(abs((csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Non-clinical/Capacity reason"),lastcol]/csv[index,lastcol])*100),1)
+OtCansPer<-round(abs((csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Other"),lastcol]/csv[index,lastcol])*100),1)
+
+
+#Get total and percentage cancellations for Scotland for last year
+LastTotalCans<-format(csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Total Cancelled"),lastcol-12],big.mark = ",",trim=TRUE,scientific = FALSE)
+LastTotalCansPer<-round(abs((csv[which(csv$Board == "NHS Scotland" & csv$Indicator == "Total Cancelled"),lastcol-12]/csv[index,lastcol-12])*100),1)
+
+
+#Create list of Cancellations percentage for all boards
+#allboards <- NULL
+
+#for (i in seq(2,lastrow,6)) {
+ # perc <- round(abs((csv[i,lastcol]/csv[i-1,lastcol])*100),1)
+  #board <- as.character(csv[i,1])
+  #boardperc <-c(board,perc)
+  #allboards <- rbind(allboards,boardperc)
+#}
+
+#Load Tidyverse
+library("tidyverse")
+
+allboards <- csv %>%
+                filter(Indicator == "Total Cancelled"  | Indicator == "Total Ops") %>%
+                select(Board, Indicator, lastcol) %>%
+                spread(Indicator, 3) %>%
+                mutate(per = (`Total Cancelled`/`Total Ops`)*100)
+
+
+#row.names(allboards)<-NULL
+
+#Find min and max cancellations for Boards
+#min <- min(as.numeric(allboards[2:16,2]))
+#max<- max(as.numeric(allboards[2:16,2]))
+
+min <- round(min(allboards$per), digits = 1)
+max <- round(max(allboards$per), digits = 1)
+
+#Creates metadata link
+MetadataLink <- paste0('http://isdscotland.org/Health-Topics/Waiting-Times/Publications/',PublicationDate,'/',PublicationDate,'-Cancellations-metadata.pdf')
+
+##Creates data table link
+DataLink <- paste0('http://isdscotland.org/Health-Topics/Waiting-Times/Publications/',PublicationDate,'/',PublicationDate,'-Cancellations.xlsx')
+
+
+#Create data frame with most recent year's data at Scotland level
+#table3<-csv[,(lastcol-12):lastcol]
+#table2<- data.frame(csv$Board,csv$Indicator,table3)
+#table<-table2[1:6,]
+
+table <- csv %>%
+            filter(Board == "NHS Scotland")
+
+#Calculates percentage cancellations of total operations for each cancellation reason
+
+Cancellation_Numbers <- function(x) {
+  
+  canc <- table %>%
+              filter(Indicator == x) %>%
+              select(3:ncol(table))
+  
+  return(canc)  
+}
+
+
+TotalOps1 <- Cancellation_Numbers("Total Ops")
+
+TotalCancellaton <- Cancellation_Numbers("Total Cancelled") 
+
+CancPer1 <- (TotalCancellaton/TotalOps1)
+
+NonClin <- Cancellation_Numbers("Non-clinical/Capacity reason")
+
+NonClinPer1 <- (NonClin/TotalOps1)
+
+Clin <- Cancellation_Numbers("Clinical reason")
+
+ClinPer1 <- (Clin/TotalOps1)
+
+Pat <- Cancellation_Numbers("Cancelled by patient")
+
+PatPer1 <- (Pat/TotalOps1)
+
+Other <- Cancellation_Numbers("Other")
+
+OtherPer1 <- (Other/TotalOps1)
+
+all1<-rbind(ClinPer1,NonClinPer1,PatPer1,OtherPer1)
+
+all<- cbind(Reason=c("Clinical reason","Non-clinical/\nCapacity \nreason","Cancelled by \npatient","Other"),all1)
+
+all2 <- melt(all)
+
+#Muliple value by 100 to get percentage
+all2$value <- all2$value*100
+
+#Creates maximum y axis value
+maxy<-round(max(all2$value),digits=0) + 1
+
+#Creates x axis labels
+labellist <- all2[which(all2$Reason=='Clinical reason'), ]
+labellist$variable <- format(as.Date(labellist$variable, "%Y-%m-%d"), format = "%b.%y")
+xlabels <- gsub("\\.","-",labellist$variable)
+#xlabels <- replace(xlabels, seq(0,12,2),"")
+
+
+
+#Uses ggplot2 to create line graph of cancellation reasons
+chart<- ggplot(data=all2, aes(x=variable,y=value,group=Reason,colour=Reason)) +
+  geom_line(size=1.0) + 
+  theme(
+    plot.title = element_text(hjust = 0.8),
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle=90, hjust = 0.95, vjust = 0.5, size = 7),
+    axis.title.y = element_text(size=8, margin = margin(0,10,0,0)),
+    axis.text.y = element_text(size=7),
+    axis.line = element_line(colour="grey"),
+    axis.ticks = element_line(colour="grey"),
+    legend.key = element_rect(colour = NA, fill = NA,size=3),
+    legend.key.size=unit(1.7,"line"),
+    legend.title=element_blank()) +
+  xlab("") + ylab("% of total planned operations") +
+  scale_y_continuous(limits = c(0, maxy),expand = c(0, 0), breaks = seq(0,maxy,0.5)) +
+  scale_x_discrete(labels = xlabels) +
+  scale_color_manual(values=c("#004785", "#00a2e5","#7f7f7f","#d0e5f3")) +
+  ggtitle("Cancellation Reason for Planned Operations") + theme(plot.title = element_text( face="bold",size=11)) 
+
+
+contact1 <- c("**Amye Thomson**", "Senior Information Analyst","0141 207 1894")
+contact2 <- c("**Adam Rennie**", "Information Analyst", "0141 282 2064")
+
+
+contact <- data.frame(contact1, contact2)
+
+
+ggsave("publicationchart.png", plot = chart, 
+       scale = 1, width = 18.88, height = 5.83, units = "cm",
+       dpi = 300, limitsize = TRUE)
+
+alt <- paste0("Provides monthly information on the total percentage of patients in NHS Scotland who had their Planned Operation Cancelled between May 2015 to ",month," ", year,". The total percentage is subdivided into clinical reasons, non clinical/capacity, cancelled by patient and other reason.")
+
+```
+
+
+
+<div custom-style="Publication Title"> Cancelled Planned Operations </div> 
+
+<div custom-style="Publication subtitle"> Month Ending `r MonthEndDay ` `r month` `r year` </div>
+<div custom-style="subtitle2"> Official Statistics publication for Scotland </div>
+<div custom-style="Subtitle3"> Publication Date: `r PubDay2` `r PubMonth` `r PubYear` </div>
+<div custom-style="RestrictedStats"> RESTRICTED STATISTICS: embargoed to 09:30 `r PubDay`/`r PubMonthNum`/`r PubYear` </div> 
+
+<div custom-style="Heading 3"> About this release </div> 
+
+This release by Information Services Division (ISD) provides a monthly update on the number of patients in NHSScotland who have had their planned hospital operation cancelled the day before, or on the day of their planned operation and the reason for this cancellation.
+
+<div custom-style="Heading 3"> Main points </div> 
+
+* The total number of planned operations across NHSScotland during `r month` `r year` was `r total`, `r changetext` of `r change`% from `r LastTotal` during `r Lastmonth` `r Lastyear`.
+
+* `r TotalCans` operations (`r TotalCansPer`% of all planned operations) were cancelled in `r month` `r year`, ranging from `r min`% to `r max`% across individual NHS Boards. This compares to `r LastTotalCans` (`r LastTotalCansPer`%) in `r Lastmonth` `r Lastyear`.
+
+* In `r month` `r year`, of all `r total` planned operations: `r PatCans` (`r PatCansPer`%) were cancelled by the patient; `r ClinCans` (`r ClinCansPer`%) were cancelled by the hospital based on clinical reasons; `r CapCans` (`r CapCansPer`%) were cancelled by the hospital due to capacity or non-clinical reasons; `r OtCans` (`r OtCansPer`%) were cancelled due to other reasons.
+
+
+![Provides monthly information on the total percentage of patients in NHS Scotland who had their Planned Operation Cancelled between May 2015 to INSERT DATE. The total percentage is subdivided into clinical reasons, non clinical/capacity, cancelled by patient and other reason.](publicationchart.png)\
+
+
+* The peak in cancellations for non-clinical/capacity reasons in November 2018 (3.4%) relates to the unplanned, temporary closure of the Cowlairs decontamination unit in NHS Greater Glasgow & Clyde. The spikes in March 2018 for non-clinical/capacity reasons (4.1%) and other reasons (1.5%) were due to poor weather affecting patient and staff travel. 
+
+<div custom-style="Heading 3">  Background </div> 
+
+These statistics are released monthly. Data for this publication are submitted from NHS Board theatre systems.
+
+<div custom-style="Heading 3"> Contact </div> 
+
+
+```{r, echo = FALSE}
+
+knitr::kable(contact, col.names=NULL, table.attr='cellpadding="20px"') 
+              
+```
+
+
+
+<div custom-style="GenEnq">General Enquiries </div> 
+nss.isdwaitingtimes@nhs.net
+
+<div custom-style="Heading 3"> Further Information </div> 
+
+
+A <Span custom-style="Hyperlink">[workbook](`r DataLink`)</span>  containing data for Scotland, NHS Boards and hospitals is available.
+
+Further information can be found on the <Span custom-style="Hyperlink">[waiting times](http://www.isdscotland.org/Health-Topics/Waiting-Times/)</span> pages of the ISD website. A <Span custom-style="Hyperlink">[metadata document](`r MetadataLink`)</span> has been produced for this publication.
+
+The next release of this publication will be `r NPubMonth` `r NPubYear`
+
+<div custom-style="Heading 3"> NHS Performs </div>
+
+A selection of information from this publication is included in <Span custom-style="Hyperlink">[NHS Performs](http://www.nhsperforms.scot/)</span>. NHS Performs is a website that brings together a range of information on how hospitals and NHS Boards within NHSScotland are performing.
