@@ -26,14 +26,20 @@ dis <- read.csv("//stats/WaitingTimes/Cancellations/Discovery/cancellations.csv"
 
 
 # 1.4 Read in Location Lookup
-loclookup <- read.csv(paste0("//stats/WaitingTimes/Cancellations/Projects/20180209-Discovery/location.csv"),
+loclookup <- read.csv(paste0("Lookups/location.csv"),
                 stringsAsFactors = F)
 
 
 # 1.5 Read in Health Board Lookup
-hblookup <- read.csv("//stats/WaitingTimes/Cancellations/Open Data/Lookups/geography_codes_and_labels_hb2014.csv",
+hblookup <- read.csv("Lookups/geography_codes_and_labels_hb2014.csv",
                         stringsAsFactors = F)
 
+# 1.6 Read in Specialty descriptions
+spec <- read.csv(paste0("Lookups/spec_lookup.csv"),
+                 check.names = F, stringsAsFactors = F)
+
+#1.7 Read in board codes file for Discovery
+bcode <- read_csv("Lookups/Health Board Area 2014 Lookup.csv")
 
 
 
@@ -55,6 +61,8 @@ folderday <- formatC(day(folder), width=2, flag="0")
 
 #Set path of where submissions are stored
 path <- paste0('//stats/WaitingTimes/Cancellations/Publications/',folderyear,foldermonth,folderday,'/FilesFromCustomer/')  
+
+
 
 
 #Get all the file names with .xls or .xlsx extension in above folder
@@ -109,16 +117,17 @@ for(i in 1:length(file.names)) {
 Currentmonth$Board <- as.character(Currentmonth$Board)
 
 #Rename select Boards
-Currentmonth$Board[Currentmonth$Board=="GoldenJubilee" | Currentmonth$Board=="GJ" | Currentmonth$Board=="GJNH"] <- "Golden Jubilee"
-Currentmonth$Board[Currentmonth$Board!="Golden Jubilee"] <- paste0("NHS ",Currentmonth$Board[Currentmonth$Board!="Golden Jubilee"] )
-Currentmonth$Board[Currentmonth$Board=="NHS A&A"] <- "NHS Ayrshire & Arran"
-Currentmonth$Board[Currentmonth$Board=="NHS D&G"] <- "NHS Dumfries & Galloway"
-Currentmonth$Board[Currentmonth$Board=="NHS ForthValley"] <- "NHS Forth Valley"
-Currentmonth$Board[Currentmonth$Board=="NHS FV"] <- "NHS Forth Valley"
-Currentmonth$Board[Currentmonth$Board=="NHS GG&C"] <- "NHS Greater Glasgow & Clyde"
-Currentmonth$Board[Currentmonth$Board=="NHS WesternIsles"] <- "NHS Western Isles"
-Currentmonth$Board[Currentmonth$Board=="NHS WI"] <- "NHS Western Isles"
-
+Currentmonth <- Currentmonth %>%
+                  mutate(Board = ifelse(Board == "GoldenJubilee"| Board=="GJ" | Board=="GJNH",
+                                              "Golden Jubilee",
+                                        ifelse(Board == "A&A", "Ayrshire & Arran",
+                                          ifelse(Board == "D&G", "Dumfries & Galloway",
+                                            ifelse(Board == "ForthValley" | Board=="FV", "Forth Valley",
+                                              ifelse(Board == "GG&C", "Greater Glasgow & Clyde",
+                                                ifelse(Board == "WesternIsles" | Board=="WI", "Western Isles",
+                                                  Board))))))) %>%
+                   mutate(Board = ifelse(Board != "Golden Jubilee",
+                                            paste0("NHS ",Board),Board))
 
 
 #Replace NAs and .. with 0
@@ -140,9 +149,10 @@ Currentmonth <- Currentmonth %>%
 
 
 #Convert factors to character variables
-Currentmonth$Hospital <- as.character(Currentmonth$Hospital)
-Currentmonth$Specialty <- as.character(Currentmonth$Specialty)
-Currentmonth$Month <- as.character(Currentmonth$Month)
+Currentmonth <- Currentmonth %>%
+                    mutate(Hospital = as.character(Hospital),
+                           Specialty = as.character(Specialty),
+                           Month = as.character(Month))
 
 
 # Format specialty codes 
@@ -152,22 +162,28 @@ Currentmonth <- Currentmonth %>%
                            Specialty = gsub('.', '', Specialty, fixed = TRUE),
                            Specialty = substr(Specialty, 1, 2)) %>%
                     group_by(Month, Board, Hospital, Specialty) %>%
-                    summarise_all(funs(sum))  %>% # aggregate up to specialty          
-                    ungroup
+                    summarise_all(list(sum))  %>% # aggregate up to specialty          
+                    ungroup()
 
 
 
 
+# 2.3 Checks for submisssions
+checks <- Currentmonth %>%
+              rowwise() %>%
+              mutate(check1 = sum(`Clinical reason` + `Cancelled by patient` + `Non-clinical/Capacity reason` +`Other`) - `Total Cancelled`, #Cancellation reasons should sum to total cancellations for each row
+                     check2 = `Total Ops` >= `Total Cancelled`) %>%  #Total Ops should be greater than or equal to total cancelled
+              filter(check1 > 0 | check2 == FALSE)
 
-
-
+#Output checks
+write.csv(checks, 'Output/Checks.csv', row.names = FALSE)
 
 
 
 #### 3. Output Specialty level database file ----
 
 #Format month as a date
-Currentmonth$Month <- as.Date(Currentmonth$Month, format = "%d/%m/%Y")
+#Currentmonth$Month <- as.Date(Currentmonth$Month, format = "%d/%m/%Y")
 
 #Bind current month's data to specialty level database
 specdat <- rbind(dat, Currentmonth)
@@ -210,8 +226,9 @@ write.csv(pub, paste0(path,'Publication Data.csv'), row.names = FALSE)
 
 # 5.1 Update All Specialties database with latest data
 
-#Convert Month to date - |Potentially redundent next month
+#Convert Month to date 
 all$Month <- as.Date(all$Month , format = "%d/%m/%Y")
+pub$Month <- as.Date(pub$Month, format = "%d/%m/%Y")
 
 #Append latest month to All Specialties database
 all <- rbind(all, pub)
@@ -342,8 +359,8 @@ ind2 <- pub %>%
 
 
 #Output to latest publication folder
-write.csv(ind1, paste0(path,'All cancellations ', month.abb[month], sprintf('%02d', year %% 100),'.csv'), row.names = FALSE)
-write.csv(ind2, paste0(path,'Cancellations for non-clinical reasons  ', month.abb[month], sprintf('%02d', year %% 100), '.csv'), row.names = FALSE)
+write.csv(ind1, paste0(path,'All cancellations ', month.abb[month], sprintf('%02d', year %% 100),'.csv'), row.names = FALSE, quote  = FALSE)
+write.csv(ind2, paste0(path,'Cancellations for non-clinical reasons  ', month.abb[month], sprintf('%02d', year %% 100), '.csv'), row.names = FALSE, quote = FALSE)
 
 
 
@@ -355,11 +372,9 @@ write.csv(ind2, paste0(path,'Cancellations for non-clinical reasons  ', month.ab
 
 #### 7. Discovery ----
 
-# Match on Specialty descriptions 
-spec <- read.csv(paste0("//stats/WaitingTimes/Cancellations/Projects/20180209-Discovery/spec_lookup.csv"),
-                 check.names = F, stringsAsFactors = F)
 
 
+#Match specialty codes to specialty descriptions
 Currentmonth <- 
   Currentmonth %>%
   rename(`Specialty Code` = Specialty) %>%  # matching variables have same name
@@ -372,9 +387,7 @@ Currentmonth <-
   Currentmonth %>%
   mutate(`Specialty Code` = ifelse(is.na(`Specialty Grouping`), 'Unknown', `Specialty Code`),
          `Specialty Grouping` = ifelse(is.na(`Specialty Grouping`), 'Unknown', `Specialty Grouping`),
-         `Specialty Description` = ifelse(is.na(`Specialty Description`), 'Unknown', `Specialty Description`)) #%>%
- # group_by(Month, Board, Hospital, `Specialty`, `Specialty Grouping`, `Specialty Description` ) %>%
-  #summarise_all(funs(sum)) 
+         `Specialty Description` = ifelse(is.na(`Specialty Description`), 'Unknown', `Specialty Description`))
 
 
 Currentmonth <- Currentmonth %>% 
@@ -416,8 +429,6 @@ Currentmonth <-
   select(-c(Add1:filler))  # remove unnecessary variables
 
 # Create Board code
-
-bcode <- read_csv("//stats/WaitingTimes/Cancellations/Projects/20180209-Discovery/Health Board Area 2014 Lookup.csv")
 
 
 Currentmonth <- Currentmonth %>%

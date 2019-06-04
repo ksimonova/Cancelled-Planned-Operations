@@ -161,8 +161,11 @@ max <- round(max(allboards$per), digits = 1)
 #Creates metadata link
 MetadataLink <- paste0('http://isdscotland.org/Health-Topics/Waiting-Times/Publications/',PublicationDate,'/',PublicationDate,'-Cancellations-metadata.pdf')
 
-##Creates data table link
+#Creates data table link
 DataLink <- paste0('http://isdscotland.org/Health-Topics/Waiting-Times/Publications/',PublicationDate,'/',PublicationDate,'-Cancellations.xlsx')
+
+#Creates Open Data Link
+OpenDataLink <- paste0('https://www.opendata.nhs.scot/dataset/cancelled-planned-operations')
 
 
 #Create data frame with most recent year's data at Scotland level
@@ -209,9 +212,9 @@ OtherPer1 <- (Other/TotalOps1)
 
 all1<-rbind(ClinPer1,NonClinPer1,PatPer1,OtherPer1)
 
-all<- cbind(Reason=c("Clinical reason","Non-clinical/\nCapacity \nreason","Cancelled by \npatient","Other"),all1)
+all3<- cbind(Reason=c("Clinical reason","Non-clinical/\nCapacity \nreason","Cancelled by \npatient","Other"),all1)
 
-all2 <- melt(all)
+all2 <- melt(all3)
 
 #Muliple value by 100 to get percentage
 all2$value <- all2$value*100
@@ -287,10 +290,10 @@ This release by Information Services Division (ISD) provides a monthly update on
 * In `r month` `r year`, of all `r total` planned operations: `r PatCans` (`r PatCansPer`%) were cancelled by the patient; `r ClinCans` (`r ClinCansPer`%) were cancelled by the hospital based on clinical reasons; `r CapCans` (`r CapCansPer`%) were cancelled by the hospital due to capacity or non-clinical reasons; `r OtCans` (`r OtCansPer`%) were cancelled due to other reasons.
 
 
-![Provides monthly information on the total percentage of patients in NHS Scotland who had their Planned Operation Cancelled between May 2015 to INSERT DATE. The total percentage is subdivided into clinical reasons, non clinical/capacity, cancelled by patient and other reason.](publicationchart.png)\
+![Provides monthly information on the total percentage of patients in NHS Scotland who had their Planned Operation Cancelled between May 2015 to `r month`  `r year`. The total percentage is subdivided into clinical reasons, non clinical/capacity, cancelled by patient and other reason.](publicationchart.png)\
 
 
-* The peak in cancellations for non-clinical/capacity reasons in November 2018 (3.4%) relates to the unplanned, temporary closure of the Cowlairs decontamination unit in NHS Greater Glasgow & Clyde. The spikes in March 2018 for non-clinical/capacity reasons (4.1%) and other reasons (1.5%) were due to poor weather affecting patient and staff travel. 
+* The peak in cancellations for non-clinical/capacity reasons in November 2018 (3.4%) relates to the unplanned, temporary closure of the Cowlairs decontamination unit in NHS Greater Glasgow & Clyde. 
 
 <div custom-style="Heading 3">  Background </div> 
 
@@ -313,11 +316,11 @@ nss.isdwaitingtimes@nhs.net
 <div custom-style="Heading 3"> Further Information </div> 
 
 
-A <Span custom-style="Hyperlink">[workbook](`r DataLink`)</span>  containing data for Scotland, NHS Boards and hospitals is available.
+A <Span custom-style="Hyperlink">[workbook](`r DataLink`)</span>  containing data for Scotland, NHS Boards and hospitals is available. This is also available as <Span custom-style="Hyperlink">[open data](`r OpenDataLink`)</span>.  
 
 Further information can be found on the <Span custom-style="Hyperlink">[waiting times](http://www.isdscotland.org/Health-Topics/Waiting-Times/)</span> pages of the ISD website. A <Span custom-style="Hyperlink">[metadata document](`r MetadataLink`)</span> has been produced for this publication.
 
-The next release of this publication will be `r NPubMonth` `r NPubYear`
+The next release of this publication will be `r NPubMonth` `r NPubYear`.
 
 <div custom-style="Heading 3"> NHS Performs </div>
 
