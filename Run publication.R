@@ -62,8 +62,6 @@ folderday <- formatC(day(folder), width=2, flag="0")
 #Set path of where submissions are stored
 path <- paste0('//stats/WaitingTimes/Cancellations/Publications/',folderyear,foldermonth,folderday,'/FilesFromCustomer/')  
 
-path <- paste0('//stats/WaitingTimes/Cancellations/Publications/20190604/FilesFromCustomer/')  
-
 
 
 
@@ -171,34 +169,14 @@ Currentmonth <- Currentmonth %>%
 
 
 # 2.3 Checks for submisssions
+checks <- Currentmonth %>%
+              rowwise() %>%
+              mutate(check1 = sum(`Clinical reason` + `Cancelled by patient` + `Non-clinical/Capacity reason` +`Other`) - `Total Cancelled`, #Cancellation reasons should sum to total cancellations for each row
+                     check2 = `Total Ops` >= `Total Cancelled`) %>%  #Total Ops should be greater than or equal to total cancelled
+              filter(check1 > 0 | check2 == FALSE)
 
-## Check 1 - Cancellation reasons should sum to total cancellations for each row
-
-check1 <- sum(rowSums(Currentmonth[,c("Clinical reason","Cancelled by patient", "Non-clinical/Capacity reason","Other")]) - Currentmonth[,"Total Cancelled"])
-if ( check1 > 0) stop("Cancellation reasons do not equal total cancellations")
-
-## Open 'error1' in environment to see source of errors for check 1
-
-error1 <- Currentmonth %>%
-  filter(Currentmonth[,"Total Cancelled"]!=rowSums(Currentmonth[,c("Clinical reason","Cancelled by patient",
-                                                                   "Non-clinical/Capacity reason","Other")]))
-#Output to csv
-
-
-
-## Check 2 - Total cancellations should be less than total operations for each row
-
-check2 <- sum(Currentmonth[,"Total Ops"] < Currentmonth[,"Total Cancelled"])
-if (check2 > 0) stop("Total cancellations exceed total operations")
-
-## Open 'error2' in Enivronment to see source of errors for check 2
-
-error2 <- Currentmonth %>%
-  filter(Currentmonth[,"Total Ops"] < Currentmonth[,"Total Cancelled"])
-
-
-
-
+#Output checks
+write.csv(checks, 'Output/Checks.csv', row.names = FALSE)
 
 
 
