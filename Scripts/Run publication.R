@@ -61,7 +61,10 @@ folderday <- formatC(day(folder), width=2, flag="0")
 
 #Set path of where submissions are stored
 path <- paste0('//stats/WaitingTimes/Cancellations/Publications/',folderyear,foldermonth,folderday,'/FilesFromCustomer/')  
- 
+
+path <- paste0('//stats/WaitingTimes/Cancellations/Publications/20190604/FilesFromCustomer/')  
+
+
 
 
 #Get all the file names with .xls or .xlsx extension in above folder
@@ -116,16 +119,17 @@ for(i in 1:length(file.names)) {
 Currentmonth$Board <- as.character(Currentmonth$Board)
 
 #Rename select Boards
-Currentmonth$Board[Currentmonth$Board=="GoldenJubilee" | Currentmonth$Board=="GJ" | Currentmonth$Board=="GJNH"] <- "Golden Jubilee"
-Currentmonth$Board[Currentmonth$Board!="Golden Jubilee"] <- paste0("NHS ",Currentmonth$Board[Currentmonth$Board!="Golden Jubilee"] )
-Currentmonth$Board[Currentmonth$Board=="NHS A&A"] <- "NHS Ayrshire & Arran"
-Currentmonth$Board[Currentmonth$Board=="NHS D&G"] <- "NHS Dumfries & Galloway"
-Currentmonth$Board[Currentmonth$Board=="NHS ForthValley"] <- "NHS Forth Valley"
-Currentmonth$Board[Currentmonth$Board=="NHS FV"] <- "NHS Forth Valley"
-Currentmonth$Board[Currentmonth$Board=="NHS GG&C"] <- "NHS Greater Glasgow & Clyde"
-Currentmonth$Board[Currentmonth$Board=="NHS WesternIsles"] <- "NHS Western Isles"
-Currentmonth$Board[Currentmonth$Board=="NHS WI"] <- "NHS Western Isles"
-
+Currentmonth <- Currentmonth %>%
+                  mutate(Board = ifelse(Board == "GoldenJubilee"| Board=="GJ" | Board=="GJNH",
+                                              "Golden Jubilee",
+                                        ifelse(Board == "A&A", "Ayrshire & Arran",
+                                          ifelse(Board == "D&G", "Dumfries & Galloway",
+                                            ifelse(Board == "ForthValley" | Board=="FV", "Forth Valley",
+                                              ifelse(Board == "GG&C", "Greater Glasgow & Clyde",
+                                                ifelse(Board == "WesternIsles" | Board=="WI", "Western Isles",
+                                                  Board))))))) %>%
+                   mutate(Board = ifelse(Board != "Golden Jubilee",
+                                            paste0("NHS ",Board),Board))
 
 
 #Replace NAs and .. with 0
@@ -147,9 +151,10 @@ Currentmonth <- Currentmonth %>%
 
 
 #Convert factors to character variables
-Currentmonth$Hospital <- as.character(Currentmonth$Hospital)
-Currentmonth$Specialty <- as.character(Currentmonth$Specialty)
-Currentmonth$Month <- as.character(Currentmonth$Month)
+Currentmonth <- Currentmonth %>%
+                    mutate(Hospital = as.character(Hospital),
+                           Specialty = as.character(Specialty),
+                           Month = as.character(Month))
 
 
 # Format specialty codes 
@@ -163,7 +168,10 @@ Currentmonth <- Currentmonth %>%
                     ungroup()
 
 
-# Checks added to make sure submissions are correct
+
+
+# 2.3 Checks for submisssions
+
 ## Check 1 - Cancellation reasons should sum to total cancellations for each row
 
 check1 <- sum(rowSums(Currentmonth[,c("Clinical reason","Cancelled by patient", "Non-clinical/Capacity reason","Other")]) - Currentmonth[,"Total Cancelled"])
@@ -174,6 +182,9 @@ if ( check1 > 0) stop("Cancellation reasons do not equal total cancellations")
 error1 <- Currentmonth %>%
   filter(Currentmonth[,"Total Cancelled"]!=rowSums(Currentmonth[,c("Clinical reason","Cancelled by patient",
                                                                    "Non-clinical/Capacity reason","Other")]))
+#Output to csv
+
+
 
 ## Check 2 - Total cancellations should be less than total operations for each row
 
@@ -184,6 +195,12 @@ if (check2 > 0) stop("Total cancellations exceed total operations")
 
 error2 <- Currentmonth %>%
   filter(Currentmonth[,"Total Ops"] < Currentmonth[,"Total Cancelled"])
+
+
+
+
+
+
 
 #### 3. Output Specialty level database file ----
 
@@ -392,9 +409,7 @@ Currentmonth <-
   Currentmonth %>%
   mutate(`Specialty Code` = ifelse(is.na(`Specialty Grouping`), 'Unknown', `Specialty Code`),
          `Specialty Grouping` = ifelse(is.na(`Specialty Grouping`), 'Unknown', `Specialty Grouping`),
-         `Specialty Description` = ifelse(is.na(`Specialty Description`), 'Unknown', `Specialty Description`)) #%>%
- # group_by(Month, Board, Hospital, `Specialty`, `Specialty Grouping`, `Specialty Description` ) %>%
-  #summarise_all(funs(sum)) 
+         `Specialty Description` = ifelse(is.na(`Specialty Description`), 'Unknown', `Specialty Description`))
 
 
 Currentmonth <- Currentmonth %>% 
