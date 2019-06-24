@@ -6,6 +6,7 @@ library('xlsx')
 library('lubridate')
 library('stringr')
 library("RcppBDT")
+library('zoo')
 
 
 #### 1. Read in database files----
@@ -511,13 +512,91 @@ board <- open %>%
             select(-Hospital) %>%
             group_by(Month, HBT2014) %>%
             summarise_all(sum) %>%
-            select(Month, HBT2014, TotalOperations:OtherReason)
+            select(Month, HBT2014, TotalOperations:OtherReason) %>%
+            ungroup
 
 #Create hospital level file
 hospital <- open %>%
               select(-HBT2014)
       
-#Output files
+
+###Compare new files to last month's files
+
+#Calculate dates for last month's file name
+monthcom <- month(Sys.Date() %m-% months(2))
+filemonthcom <- month.name[monthcom]
+yearcom <- year(Sys.Date() %m-% months(2))
+
+#Create function to format previous month's open data files
+opendatfiles <- function(filepath){
+  
+  oldfile <- read_csv(filepath) %>%
+                select(-TotalOperationsQF, -TotalCancelledQF, -CancelledByPatientReasonQF, -ClinicalReasonQF,
+                        -NonClinicalCapacityReasonQF, -OtherReasonQF) %>%
+                mutate(Month = as.character(Month))
+
+  return(oldfile)
+  
+}
+
+#Apply open data function to last month's open data files
+scotold <-opendatfiles(paste0("//stats/WaitingTimes/Cancellations/Open Data/Output/Cancellations_Scotland_",
+                 filemonthcom, "_", yearcom, ".csv"))
+
+
+boardold <- opendatfiles(paste0("//stats/WaitingTimes/Cancellations/Open Data/Output/Cancellations_by_Board_",
+                                            filemonthcom, "_", yearcom, ".csv")) 
+
+
+hospold <- opendatfiles(paste0("//stats/WaitingTimes/Cancellations/Open Data/Output/Cancellations_by_Hospital_",
+                                               filemonthcom, "_", yearcom, ".csv")) 
+
+#Get latest month
+maxmonth <- max(open$Month)
+
+
+#Create function to compare last month's files to this month's
+comparefiles <- function(newfile, oldfile, var){
+  
+  opendatfile <- newfile %>%
+                    mutate(Month = as.character(Month)) %>%
+                    left_join(oldfile, by=c("Month", var)) %>%
+                    mutate(TotalOperationsQF = ifelse(TotalOperations.x != TotalOperations.y &
+                                        Month != maxmonth, "r", NA),
+                          TotalCancelledQF = ifelse(TotalCancelled.x != TotalCancelled.y &
+                                       Month != maxmonth, "r", NA),
+                          CancelledByPatientReasonQF = ifelse(CancelledByPatientReason.x != CancelledByPatientReason.y &
+                                                 Month != maxmonth, "r", NA),
+                          ClinicalReasonQF = ifelse(CancelledByPatientReason.x != CancelledByPatientReason.y &
+                                       Month != maxmonth, "r", NA),
+                          NonClinicalCapacityReasonQF = ifelse(NonClinicalCapacityReason.x != NonClinicalCapacityReason.y &
+                                                  Month != maxmonth, "r", NA),
+                          OtherReasonQF = ifelse(OtherReason.x != OtherReason.y &
+                                    Month != maxmonth, "r", NA)) %>%
+                  select(-contains(".y")) %>%
+                  rename_at(vars(contains('.x')), funs(sub('.x', '', .))) %>%
+                  select(Month, var, TotalOperations, TotalOperationsQF, TotalCancelled, TotalCancelledQF,
+                          CancelledByPatientReason, CancelledByPatientReasonQF, ClinicalReason, ClinicalReasonQF,
+                            NonClinicalCapacityReason, NonClinicalCapacityReasonQF, OtherReason, OtherReasonQF)
+  
+  return(opendatfile)
+  
+}
+
+
+#Apply function to open data files
+
+scot <- comparefiles(scot,scotold, "Country")
+
+board <- comparefiles(board, boardold, "HBT2014")
+
+hospital <-comparefiles(hospital, hospold, "Hospital")
+                  
+
+
+
+###Output files
+
 
 #Calculate dates for file name
 month2 <- month(Sys.Date() %m-% months(1))
@@ -526,8 +605,8 @@ year2 <- year(Sys.Date() %m-% months(1))
 
 #Write files to csv
 write.csv(scot, paste0("//stats/WaitingTimes/Cancellations/Open Data/Output/Cancellations_Scotland_",
-                              filemonth, "_", year2, ".csv"), row.names= FALSE)
+                              filemonth, "_", year2, ".csv"), row.names= FALSE,  na = "")
 write.csv(board, paste0("//stats/WaitingTimes/Cancellations/Open Data/Output/Cancellations_by_Board_",
-                            filemonth, "_", year2, ".csv"), row.names = FALSE)
+                            filemonth, "_", year2, ".csv"), row.names = FALSE,  na = "")
 write.csv(hospital, paste0("//stats/WaitingTimes/Cancellations/Open Data/Output/Cancellations_by_Hospital_",
-                          filemonth, "_", year2, ".csv"), row.names = FALSE)
+                          filemonth, "_", year2, ".csv"), row.names = FALSE,  na = "")
