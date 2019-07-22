@@ -1,12 +1,26 @@
 
+packages<-function(x){
+  x<-as.character(match.call()[[2]])
+  if(!require(x,
+              character.only = TRUE)){
+    install.packages(pkgs=x,
+                     repos="http://cran.r-project.org")
+    require(x,
+            character.only = TRUE)
+  }
+}
 
-library('tidyverse')
-library('reshape2')
-library('xlsx')
-library('lubridate')
-library('stringr')
-library("RcppBDT")
-library('zoo')
+
+
+
+packages('tidyverse')
+packages('reshape2')
+packages('readxl')
+packages('lubridate')
+packages('stringr')
+packages("RcppBDT")
+packages('zoo')
+
 
 
 #### 1. Read in database files----
@@ -83,11 +97,11 @@ Currentmonth <- NULL
 for(i in 1:length(file.names)) {
       
       #Read in file
-      file <- read.xlsx(paste0(path,file.names[i],sep=""),sheetName="Return")
+      file <- read_excel(paste0(path,file.names[i],sep=""), sheet = "Return")
   
       #Change names of columns if needed
-      names(file)[names(file) == 'Hospital.Code'] <- 'Hospital'
-      names(file)[names(file) == 'Specialty.Code'] <- 'Specialty'
+      names(file)[str_detect(names(file), "Hospital")] <- 'Hospital'
+      names(file)[str_detect(names(file), "Specialty")] <- 'Specialty'
       
       #Delete any rows where Hospital or Specialty is blank
       file <- file[!is.na(file[,1]),]  
@@ -140,13 +154,13 @@ Currentmonth[Currentmonth==".."] <-0
 
 #Rename Columns
 Currentmonth <- Currentmonth %>% 
-                  rename(
-                      `Total Ops` = `Total.no.of.scheduled.elective.operations.in.theatre.systems`,   
-                      `Total Cancelled` = `Total.no.of.scheduled.elective.cancellations.in..theatre.systems`,
-                      `Clinical reason` = `Cancellation.based.on.clinical.reason.by.hospital`,
-                      `Non-clinical/Capacity reason` = `Cancellation.based.on.capacity.or.non.clinical.reason.by.hospital`,
-                      `Cancelled by patient` = `Cancelled.by.Patient`,
-                      `Other` = `Other.reason`)
+                        rename(
+                            `Total Ops` = `Total no of scheduled elective operations in theatre systems`,   
+                            `Total Cancelled` = `Total no of scheduled elective cancellations in  theatre systems`,
+                            `Clinical reason` = `Cancellation based on clinical reason by hospital`,
+                            `Non-clinical/Capacity reason` = `Cancellation based on capacity or non-clinical reason by hospital`,
+                            `Cancelled by patient` = `Cancelled by Patient`,
+                            `Other` = `Other reason`)
 
 
 #Convert factors to character variables
