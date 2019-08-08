@@ -1,3 +1,18 @@
+########################################################## 
+# Run publication
+# Amye Thomson
+# 25/07/2019
+# Extraction and Prepartion
+# Written/run on R Studio Desktop
+# R 3.5.1
+# Pulls together and cleans Cancellations data the produces the publication output,
+#   NHS performs, Discovery and Open Data files
+# Approximate run time 
+########################################################## 
+
+
+
+
 
 packages<-function(x){
   x<-as.character(match.call()[[2]])
@@ -133,17 +148,15 @@ Currentmonth$Board <- as.character(Currentmonth$Board)
 
 #Rename select Boards
 Currentmonth <- Currentmonth %>%
-                  mutate(Board = ifelse(Board == "GoldenJubilee"| Board=="GJ" | Board=="GJNH",
-                                              "Golden Jubilee",
-                                        ifelse(Board == "A&A", "Ayrshire & Arran",
-                                          ifelse(Board == "D&G", "Dumfries & Galloway",
-                                            ifelse(Board == "ForthValley" | Board=="FV", "Forth Valley",
-                                              ifelse(Board == "GG&C", "Greater Glasgow & Clyde",
-                                                ifelse(Board == "WesternIsles" | Board=="WI", "Western Isles",
-                                                  Board))))))) %>%
-                   mutate(Board = ifelse(Board != "Golden Jubilee",
-                                            paste0("NHS ",Board),Board))
-
+                      mutate(Board = case_when(Board == "GoldenJubilee"| Board=="GJ" | Board=="GJNH" ~ "Golden Jubilee",
+                                                Board == "A&A" ~ "Ayrshire & Arran",
+                                                Board == "D&G" ~ "Dumfries & Galloway",
+                                                Board == "ForthValley" | Board=="FV" ~ "Forth Valley",
+                                                Board == "GG&C" ~ "Greater Glasgow & Clyde",
+                                                Board == "WesternIsles" | Board=="WI" ~ "Western Isles",
+                                                TRUE ~ Board)) %>%
+                      mutate(Board = ifelse(Board != "Golden Jubilee",
+                                         paste0("NHS ",Board),Board))
 
 #Replace NAs and .. with 0
 Currentmonth[is.na(Currentmonth)] <-0
@@ -330,26 +343,17 @@ pub <- pub %>%
           select(Month, Location, `Total Ops`, `Total Cancelled`, `Non-clinical/Capacity reason`) %>%
           mutate(Indicator1 = round(`Total Cancelled`/`Total Ops`, digits = 3),
                  Indicator2 = round(`Non-clinical/Capacity reason`/`Total Ops`, digits=3)) %>%
-          mutate(Location = ifelse(Location == "New Dumfries & Galloway Royal Infirmary"
-                                                , "Dumfries & Galloway Royal Infirmary",
-                            ifelse(Location == "West Glasgow/Gartnavel General",
-                                              "Gartnavel General Hospital", 
-                            ifelse(Location == "Monklands District General Hospital",
-                                                  "Monklands Hospital", 
-                            ifelse(Location == "St John's Hospital",
-                                                "St John's Hospital at Howden",
-                            ifelse(Location == "Royal Infirmary of Edinburgh at Little France",
-                                                  "Royal Infirmary of Edinburgh",
-                            ifelse(Location == "Lorn & Islands Hospital",
-                                                  "Lorn & Islands District General Hospital", 
-                            ifelse(Location == "Stobhill Hospital",
-                                              "New Stobhill Hospital",
-                            ifelse(Location == "Victoria Infirmary",
-                                                "New Victoria Hospital",
-                            ifelse(Location == "Royal Hospital for Children",
-                                               "Royal Hospital for Children Glasgow",
-                            ifelse(Location == "Royal Hospital for Sick Children (Edinburgh)",
-                                              "Royal Hospital for Sick Children Edinburgh",Location))))))))))) %>%
+          mutate(Location = case_when(Location == "New Dumfries & Galloway Royal Infirmary" ~ "Dumfries & Galloway Royal Infirmary",
+                                      Location == "West Glasgow/Gartnavel General" ~ "Gartnavel General Hospital", 
+                                      Location == "Monklands District General Hospital" ~ "Monklands Hospital", 
+                                      Location == "St John's Hospital" ~ "St John's Hospital at Howden",
+                                      Location == "Royal Infirmary of Edinburgh at Little France" ~ "Royal Infirmary of Edinburgh",
+                                      Location == "Lorn & Islands Hospital" ~ "Lorn & Islands District General Hospital", 
+                                      Location == "Stobhill Hospital" ~ "New Stobhill Hospital",
+                                      Location == "Victoria Infirmary" ~ "New Victoria Hospital",
+                                      Location == "Royal Hospital for Children" ~ "Royal Hospital for Children Glasgow",
+                                      Location == "Royal Hospital for Sick Children (Edinburgh)" ~ "Royal Hospital for Sick Children Edinburgh",
+                                      TRUE ~ Location)) %>%
           filter(!(Location %in% c("Aberdeen Maternity Hospital",
                                    "Golden Jubilee",
                                    "Mountainhall Treatment Centre",
@@ -390,10 +394,9 @@ write.csv(ind2, paste0(path,'Cancellations for non-clinical reasons  ', month.ab
 
 
 #Match specialty codes to specialty descriptions
-Currentmonth <- 
-  Currentmonth %>%
-  rename(`Specialty Code` = Specialty) %>%  # matching variables have same name
-  left_join(spec)
+Currentmonth <- Currentmonth %>%
+                    rename(`Specialty Code` = Specialty) %>%  # matching variables have same name
+                    left_join(spec)
 
 rm(spec)
 
